@@ -5,6 +5,7 @@ import Image from "next/image";
 
 const SERVER_ADDRESS = "play.dactylion.net";
 const SITE_BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+const MARKET_API = "https://dactylion-market-api.marcellusperrycxeh.chatgpt.site";
 
 const news = [
   {
@@ -30,28 +31,39 @@ const news = [
   },
 ];
 
-const products = [
+type Product = {
+  id: string;
+  kind: "vip" | "spawner";
+  name: string;
+  subtitle: string;
+  price: number;
+  color: string;
+  order: number;
+};
+
+const products: Product[] = [
   {
-    icon: "V",
-    eyebrow: "RÜTBE",
-    title: "VIP Paketleri",
-    text: "Özel renkler, kozmetik ayrıcalıklar ve dengeli oyun avantajları.",
-    price: "Yakında",
+    id: "vip-dactylion-plus", kind: "vip", name: "DactylionVIP+", subtitle: "En üst seviye Dactylion ayrıcalıkları", price: 5000, color: "#dc2626", order: 1,
   },
   {
-    icon: "K",
-    eyebrow: "KREDİ",
-    title: "Kredi Paketleri",
-    text: "Güvenli ödeme altyapısı tamamlandığında hesabına otomatik tanımlanacak.",
-    price: "Yakında",
+    id: "vip-dactylion", kind: "vip", name: "DactylionVIP", subtitle: "Kırmızı geçişli özel rütbe", price: 3500, color: "#ef4444", order: 2,
   },
   {
-    icon: "A",
-    eyebrow: "ANAHTAR",
-    title: "Kasa Anahtarları",
-    text: "Sezonluk ödüller ve sunucu ekonomisine uygun içerikler.",
-    price: "Yakında",
+    id: "vip-ultra", kind: "vip", name: "UltraVIP", subtitle: "Mavi geçişli özel rütbe", price: 2000, color: "#38bdf8", order: 3,
   },
+  { id: "vip-mega", kind: "vip", name: "MegaVIP", subtitle: "Mor geçişli özel rütbe", price: 1000, color: "#a855f7", order: 4 },
+  { id: "vip", kind: "vip", name: "VIP", subtitle: "SkyBlock macerana güçlü başlangıç", price: 500, color: "#facc15", order: 5 },
+  { id: "spawner-iron-golem", kind: "spawner", name: "Demir Golem Spawner", subtitle: "En değerli üretim spawnerı", price: 2500, color: "#cbd5e1", order: 10 },
+  { id: "spawner-witch", kind: "spawner", name: "Cadı Spawner", subtitle: "Çeşitli değerli ganimetler", price: 2000, color: "#a855f7", order: 11 },
+  { id: "spawner-guardian", kind: "spawner", name: "Guardian Spawner", subtitle: "Prizmarin üretiminin merkezi", price: 1750, color: "#22d3ee", order: 12 },
+  { id: "spawner-spider", kind: "spawner", name: "Örümcek Spawner", subtitle: "İp ve örümcek gözü üretimi", price: 1500, color: "#64748b", order: 13 },
+  { id: "spawner-blaze", kind: "spawner", name: "Blaze Spawner", subtitle: "Blaze çubuğu üretimi", price: 1250, color: "#f97316", order: 14 },
+  { id: "spawner-skeleton", kind: "spawner", name: "İskelet Spawner", subtitle: "Kemik ve ok üretimi", price: 1000, color: "#d6d3d1", order: 15 },
+  { id: "spawner-zombie", kind: "spawner", name: "Zombi Spawner", subtitle: "Çürük et ve nadir demir üretimi", price: 850, color: "#65a30d", order: 16 },
+  { id: "spawner-nether-zombie", kind: "spawner", name: "Nether Zombisi Spawner", subtitle: "Altın külçesi üretimi", price: 700, color: "#be123c", order: 17 },
+  { id: "spawner-sheep", kind: "spawner", name: "Koyun Spawner", subtitle: "Yün ve koyun eti üretimi", price: 500, color: "#f8fafc", order: 18 },
+  { id: "spawner-cow", kind: "spawner", name: "İnek Spawner", subtitle: "Deri ve et üretimi", price: 500, color: "#92400e", order: 19 },
+  { id: "spawner-pig", kind: "spawner", name: "Domuz Spawner", subtitle: "Domuz eti üretimi", price: 500, color: "#f9a8d4", order: 20 },
 ];
 
 function BrandMark({ small = false }: { small?: boolean }) {
@@ -66,12 +78,107 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [noticeOpen, setNoticeOpen] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [loginCode, setLoginCode] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [token, setToken] = useState("");
+  const [playerName, setPlayerName] = useState("");
+  const [credits, setCredits] = useState(0);
+  const [activeStore, setActiveStore] = useState<"vip" | "spawner">("vip");
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState("");
 
   useEffect(() => {
     const closeMenu = () => setMenuOpen(false);
     window.addEventListener("hashchange", closeMenu);
     return () => window.removeEventListener("hashchange", closeMenu);
   }, []);
+
+  useEffect(() => {
+    const saved = window.sessionStorage.getItem("dactylion-market-token");
+    if (!saved) return;
+    fetch(`${MARKET_API}/api/me`, {
+      headers: { Authorization: `Bearer ${saved}` },
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error();
+        return response.json();
+      })
+      .then((data) => {
+        setToken(saved);
+        setPlayerName(data.player.name);
+        setCredits(data.player.credits);
+      })
+      .catch(() => window.sessionStorage.removeItem("dactylion-market-token"));
+  }, []);
+
+  async function login() {
+    const code = loginCode.replace(/\D/g, "").slice(0, 6);
+    if (code.length !== 6) {
+      setLoginError("Oyunda /sitekod yazarak aldığın 6 haneli kodu gir.");
+      return;
+    }
+    setBusy(true);
+    setLoginError("");
+    try {
+      const response = await fetch(`${MARKET_API}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Giriş yapılamadı.");
+      window.sessionStorage.setItem("dactylion-market-token", data.token);
+      setToken(data.token);
+      setPlayerName(data.player.name);
+      setCredits(data.player.credits);
+      setLoginOpen(false);
+      setLoginCode("");
+      setToast(`Hoş geldin ${data.player.name}.`);
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : "Giriş yapılamadı.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function logout() {
+    if (token) {
+      void fetch(`${MARKET_API}/api/auth/logout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    }
+    window.sessionStorage.removeItem("dactylion-market-token");
+    setToken("");
+    setPlayerName("");
+    setCredits(0);
+  }
+
+  async function purchase() {
+    if (!selectedProduct || !token) return;
+    setBusy(true);
+    try {
+      const response = await fetch(`${MARKET_API}/api/purchase`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ itemId: selectedProduct.id }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Satın alım tamamlanamadı.");
+      setCredits(data.credits);
+      setSelectedProduct(null);
+      setToast(`${data.order.itemName} oyun hesabına teslimat sırasına alındı.`);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Satın alım tamamlanamadı.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function copyAddress() {
     try {
@@ -109,14 +216,14 @@ export default function Home() {
         <nav className={menuOpen ? "main-nav main-nav--open" : "main-nav"} aria-label="Ana menü">
           <a className="active" href="#anasayfa">Anasayfa</a>
           <a href="#magaza">Mağaza</a>
-          <a href="#kredi">Kredi Yükle</a>
+          <a href="#magaza">VIP & Spawner</a>
           <a href="#destek">Destek</a>
           <a href="#basvuru">Başvuru</a>
           <a href="#kurallar">Kurallar</a>
         </nav>
-        <button className="account-button" type="button" onClick={() => setNoticeOpen(true)}>
+        <button className="account-button" type="button" onClick={() => token ? void logout() : setLoginOpen(true)}>
           <span className="account-dot" />
-          Oyuncu Girişi
+          {token ? `${playerName} · ${credits} Kredi` : "Oyuncu Girişi"}
         </button>
       </header>
 
@@ -245,24 +352,41 @@ export default function Home() {
           <p>DACTYLION MAĞAZA</p>
           <h2>Macera sana ait.<br /><em>Tarzını sen seç.</em></h2>
           <p className="store-copy">
-            Mağaza arayüzü hazır. Güvenli ödeme ve oyun içi teslimat bağlantısı
-            tamamlandıktan sonra satışa açılacak.
+            VIP rütbeni veya spawnerını krediyle seç. Satın aldığın içerik,
+            Minecraft sunucusuna bağlandığında hesabına otomatik teslim edilir.
           </p>
-          <div className="security-note"><span>◆</span> ÖDEME SİSTEMİ ŞU AN KAPALI</div>
+          <div className="security-note"><span>◆</span> KREDİ SATILMAZ · YALNIZCA SUNUCU YETKİLİSİ TANIMLAR</div>
+          <div className="store-account">
+            {token ? (
+              <><small>GİRİŞ YAPILDI</small><b>{playerName}</b><strong>{credits.toLocaleString("tr-TR")} Kredi</strong></>
+            ) : (
+              <><small>OYUNCU HESABI</small><b>Oyunda /sitekod yaz</b><button type="button" onClick={() => setLoginOpen(true)}>KODLA GİRİŞ YAP</button></>
+            )}
+          </div>
         </div>
-        <div className="product-grid" id="kredi">
-          {products.map((product) => (
-            <article className="product-card" key={product.title}>
-              <span className="product-icon">{product.icon}</span>
-              <span className="product-eyebrow">{product.eyebrow}</span>
-              <h3>{product.title}</h3>
-              <p>{product.text}</p>
-              <div className="product-footer">
-                <b>{product.price}</b>
-                <button type="button" onClick={() => setNoticeOpen(true)}>İNCELE →</button>
-              </div>
-            </article>
-          ))}
+        <div className="store-catalog" id="kredi">
+          <div className="store-tabs">
+            <button className={activeStore === "vip" ? "active" : ""} type="button" data-store-tab="vip" onClick={() => setActiveStore("vip")}>VIP RÜTBELERİ</button>
+            <button className={activeStore === "spawner" ? "active" : ""} type="button" data-store-tab="spawner" onClick={() => setActiveStore("spawner")}>SPAWNERLAR</button>
+          </div>
+          <div className="product-grid market-grid">
+            {products.map((product) => (
+              <article className={`product-card market-product${product.kind !== activeStore ? " market-product--hidden" : ""}`} data-kind={product.kind} data-item-id={product.id} data-item-name={product.name} data-item-price={product.price} key={product.id}>
+                <span className="product-icon" style={{ background: `linear-gradient(145deg, ${product.color}, #360606)` }}>
+                  {product.kind === "vip" ? "V" : "S"}
+                </span>
+                <span className="product-eyebrow">{product.kind === "vip" ? "RÜTBE" : "SPAWNER"}</span>
+                <h3>{product.name}</h3>
+                <p>{product.subtitle}</p>
+                <div className="product-footer">
+                  <b>{product.price.toLocaleString("tr-TR")} Kredi</b>
+                  <button type="button" onClick={() => token ? setSelectedProduct(product) : setLoginOpen(true)}>
+                    {token && credits < product.price ? "YETERSİZ KREDİ" : "SATIN AL →"}
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -316,6 +440,36 @@ export default function Home() {
           </section>
         </div>
       )}
+
+      {loginOpen && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setLoginOpen(false)}>
+          <section className="notice-modal login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title" onMouseDown={(event) => event.stopPropagation()}>
+            <button className="modal-close" type="button" aria-label="Pencereyi kapat" onClick={() => setLoginOpen(false)}>×</button>
+            <span className="red-label">GÜVENLİ OYUNCU GİRİŞİ</span>
+            <h2 id="login-title">Oyunda /sitekod yaz.</h2>
+            <p>Sunucunun verdiği tek kullanımlık 6 haneli kodu aşağıya gir. Minecraft şifreni hiçbir zaman istemeyiz.</p>
+            <input aria-label="6 haneli giriş kodu" inputMode="numeric" maxLength={6} placeholder="000000" value={loginCode} onChange={(event) => setLoginCode(event.target.value.replace(/\D/g, "").slice(0, 6))} />
+            {loginError && <span className="form-error">{loginError}</span>}
+            <button className="primary-button" type="button" disabled={busy} onClick={() => void login()}>{busy ? "BAĞLANIYOR..." : "HESABIMA GİR"}</button>
+          </section>
+        </div>
+      )}
+
+      {selectedProduct && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setSelectedProduct(null)}>
+          <section className="notice-modal purchase-modal" role="dialog" aria-modal="true" aria-labelledby="purchase-title" onMouseDown={(event) => event.stopPropagation()}>
+            <button className="modal-close" type="button" aria-label="Pencereyi kapat" onClick={() => setSelectedProduct(null)}>×</button>
+            <span className="red-label">SATIN ALIM ONAYI</span>
+            <h2 id="purchase-title">{selectedProduct.name}</h2>
+            <p><b>{selectedProduct.price.toLocaleString("tr-TR")} kredi</b> bakiyenden düşülecek ve ürün <b>{playerName}</b> hesabına teslim edilecek.</p>
+            <button className="primary-button" type="button" disabled={busy || credits < selectedProduct.price} onClick={() => void purchase()}>
+              {busy ? "İŞLENİYOR..." : credits < selectedProduct.price ? "YETERSİZ KREDİ" : "SATIN ALMAYI ONAYLA"}
+            </button>
+          </section>
+        </div>
+      )}
+
+      {toast && <button className="market-toast" type="button" onClick={() => setToast("")}>{toast}</button>}
     </main>
   );
 }
