@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 
 const SERVER_ADDRESS = "play.dactylion.net";
+const SITE_BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
 const news = [
   {
@@ -122,7 +123,7 @@ export default function Home() {
       <section className="hero" id="anasayfa" aria-labelledby="hero-title">
         <Image
           className="hero-art"
-          src="/og.png"
+          src={`${SITE_BASE_PATH}/og.png`}
           alt=""
           fill
           priority

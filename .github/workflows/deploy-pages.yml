@@ -40,6 +40,8 @@ jobs:
 
       - name: Statik siteyi oluştur
         run: pnpm build
+        env:
+          NEXT_PUBLIC_BASE_PATH: /dactylion-web
 
       - name: Yayın paketini hazırla
         uses: actions/upload-pages-artifact@v3
