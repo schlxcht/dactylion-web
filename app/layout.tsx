@@ -15,13 +15,13 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://schlxcht.github.io/dactylion-web/"),
-  title: "Dactylion SkyBlock | Adanı Kur, Ekonomini Büyüt",
-  description: "Dactylion SkyBlock resmi oyuncu portalı. Kredini yükle, bakiyeni kontrol et ve destek talebi aç.",
+  title: "Dactylion Network | SkyBlock Oyuncu Portalı",
+  description: "Dactylion Network resmi SkyBlock portalı. Haberleri takip et, kredini yükle, destek ve başvuru kaydı aç.",
   applicationName: "Dactylion SkyBlock",
   keywords: ["Dactylion", "Minecraft", "SkyBlock", "Türkiye", "Minecraft sunucusu"],
   openGraph: {
     title: "Dactylion SkyBlock",
-    description: "Adanı kur. Ekonomini büyüt.",
+    description: "Modern Türk SkyBlock deneyimi ve güvenli oyuncu portalı.",
     url: "https://schlxcht.github.io/dactylion-web/",
     siteName: "Dactylion SkyBlock",
     locale: "tr_TR",
@@ -31,13 +31,13 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Dactylion SkyBlock",
-    description: "Adanı kur. Ekonomini büyüt.",
+    description: "Modern Türk SkyBlock deneyimi ve güvenli oyuncu portalı.",
     images: ["og.png"],
   },
-  icons: { icon: "og.png" },
+  icons: { icon: "dactylion-logo.png", apple: "dactylion-logo.png" },
 };
 
-export const viewport: Viewport = { themeColor: "#120709", colorScheme: "dark" };
+export const viewport: Viewport = { themeColor: "#8e111b", colorScheme: "light" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <html lang="tr"><body className={`${rajdhani.variable} ${inter.variable}`}>{children}</body></html>;
