@@ -26,9 +26,10 @@ gönderimler GitHub Actions ile GitHub Pages yayınına alınır.
 
 ## Güvenlik modeli
 
-Oyuncu girişi, oyunda üretilen tek kullanımlık `/sitekod` ile yapılır. Kredi
-yükleme talepleri ödeme referansıyla personel onayına gider. Ödeme sağlayıcısı ve
-mağaza sunucu sırları statik ön yüze eklenmez. Ürün fiyatları ve bakiye düşümü API
-tarafında doğrulanır.
+Oyuncu girişi Minecraft sunucusundaki AuthMe hesabıyla yapılır. Şifre statik ön
+yüze veya site veritabanına kaydedilmez; kısa ömürlü ve şifrelenmiş doğrulama
+isteğini yalnızca Minecraft köprüsü açar ve AuthMe doğrular. Personel yetkileri
+LuckPerms rollerinden gelir. Kredi yükleme talepleri ödeme referansıyla yönetici
+onayına gider. Ürün fiyatları ve bakiye düşümü API tarafında doğrulanır.
 
 Bu proje Mojang veya Microsoft ile bağlantılı değildir.

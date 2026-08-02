@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { CreditRequest, Player, ProfilePage, StaffPanel, SupportTicket } from "./portal-components";
 
 const SERVER_ADDRESS = "play.dactylion.net";
 const DISCORD_URL = "https://discord.gg/SwGmr6K44z";
@@ -9,11 +10,9 @@ const SITE_BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const MARKET_API = "https://dactylion-market-api.marcellusperrycxeh.chatgpt.site";
 const TOKEN_KEY = "dactylion-market-token";
 
-type PageName = "home" | "credit" | "support" | "application" | "rules";
-type Player = { uuid: string; name: string; credits: number };
+type PageName = "home" | "credit" | "support" | "application" | "rules" | "profile" | "staff";
 type CreditPackage = { id: string; credits: number; priceKurus: number };
-type CreditRequest = { id: string; package_id: string; credits: number; price_kurus: number; payment_reference: string; status: "pending" | "processing" | "approved" | "rejected"; created_at: number };
-type SupportTicket = { id: string; category: string; subject: string; message: string; status: "open" | "closed"; created_at: number };
+type Order = { id: string; item_name: string; price: number; status: string; created_at: number };
 
 const packageFallback: CreditPackage[] = [
   { id: "credit-500", credits: 500, priceKurus: 5_000 },
@@ -43,6 +42,8 @@ const pageLabels: Record<PageName, string> = {
   support: "Destek Talepleri",
   application: "Başvuru",
   rules: "Oyun Kuralları ve İşleyiş Hakkında",
+  profile: "Oyuncu Profili",
+  staff: "Personel Paneli",
 };
 
 const news = [
@@ -71,7 +72,9 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
-  const [loginCode, setLoginCode] = useState("");
+  const [loginUsername, setLoginUsername] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginStage, setLoginStage] = useState("");
   const [loginError, setLoginError] = useState("");
   const [token, setToken] = useState(() => typeof window === "undefined" ? "" : window.sessionStorage.getItem(TOKEN_KEY) ?? "");
   const [player, setPlayer] = useState<Player | null>(null);
@@ -80,6 +83,7 @@ export default function Home() {
   const [paymentReference, setPaymentReference] = useState("");
   const [creditRequests, setCreditRequests] = useState<CreditRequest[]>([]);
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [supportFormOpen, setSupportFormOpen] = useState(false);
   const [supportCategory, setSupportCategory] = useState("technical");
   const [supportSubject, setSupportSubject] = useState("");
@@ -118,6 +122,7 @@ export default function Home() {
         authorizedFetch("/api/support"),
       ]);
       setPlayer(me.player);
+      setOrders(me.orders ?? []);
       setCreditRequests(requests.requests ?? []);
       setSupportTickets(tickets.tickets ?? []);
     } catch (error) {
@@ -135,7 +140,7 @@ export default function Home() {
   useEffect(() => {
     const syncPage = () => {
       const value = window.location.hash.replace("#", "") as PageName;
-      if (["home", "credit", "support", "application", "rules"].includes(value)) setPage(value);
+      if (["home", "credit", "support", "application", "rules", "profile", "staff"].includes(value)) setPage(value);
     };
     syncPage();
     window.addEventListener("hashchange", syncPage);
@@ -163,29 +168,51 @@ export default function Home() {
   }
 
   async function login() {
-    const code = loginCode.replace(/\D/g, "").slice(0, 6);
-    if (code.length !== 6) {
-      setLoginError("Oyunda /sitekod yazarak aldığın 6 haneli kodu gir.");
+    const username = loginUsername.trim();
+    if (!/^[A-Za-z0-9_]{3,16}$/.test(username) || loginPassword.length < 8) {
+      setLoginError("Geçerli Minecraft kullanıcı adını ve en az 8 karakterlik AuthMe şifreni yaz.");
       return;
     }
     setBusy(true);
     setLoginError("");
+    setLoginStage("Minecraft sunucusundaki AuthMe doğrulaması bekleniyor...");
     try {
       const response = await fetch(`${MARKET_API}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ username, password: loginPassword }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Giriş yapılamadı.");
-      window.sessionStorage.setItem(TOKEN_KEY, data.token);
-      setToken(data.token);
-      setPlayer(data.player);
+      setLoginPassword("");
+      let result: Record<string, unknown> = {};
+      while (Date.now() < Number(data.expiresAt)) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1_100));
+        const statusResponse = await fetch(`${MARKET_API}/api/auth/status`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ challengeId: data.challengeId, pollToken: data.pollToken }),
+        });
+        result = await statusResponse.json();
+        if (statusResponse.status === 202) continue;
+        if (!statusResponse.ok) throw new Error(String(result.error ?? "Kullanıcı adı veya şifre hatalı."));
+        break;
+      }
+      const authToken = typeof result.token === "string" ? result.token : "";
+      const authenticatedPlayer = result.player as Player | undefined;
+      if (!authToken || !authenticatedPlayer) throw new Error("Giriş doğrulamasının süresi doldu. Tekrar dene.");
+      window.sessionStorage.setItem(TOKEN_KEY, authToken);
+      setToken(authToken);
+      setPlayer(authenticatedPlayer);
       setLoginOpen(false);
-      setLoginCode("");
-      showToast(`Hoş geldin ${data.player.name}.`);
+      setLoginUsername("");
+      setLoginStage("");
+      navigate("profile");
+      showToast(`Hoş geldin ${authenticatedPlayer.name}.`);
     } catch (error) {
       setLoginError(error instanceof Error ? error.message : "Giriş yapılamadı.");
+      setLoginPassword("");
+      setLoginStage("");
     } finally {
       setBusy(false);
     }
@@ -198,6 +225,8 @@ export default function Home() {
     setPlayer(null);
     setCreditRequests([]);
     setSupportTickets([]);
+    setOrders([]);
+    navigate("home");
   }
 
   async function submitCreditRequest(event: FormEvent) {
@@ -282,10 +311,12 @@ export default function Home() {
             <button className={page === "support" ? "active" : ""} onClick={() => navigate("support")} type="button">▣ <span>Destek</span></button>
             <button className={page === "application" ? "active" : ""} onClick={() => navigate("application")} type="button">✎ <span>Başvuru</span></button>
             <button className={page === "rules" ? "active" : ""} onClick={() => navigate("rules")} type="button">⚑ <span>Kurallar</span></button>
+            {player && <button className={page === "profile" ? "active" : ""} onClick={() => navigate("profile")} type="button">▦ <span>Profilim</span></button>}
+            {player?.permissions.supportRead && <button className={page === "staff" ? "active" : ""} onClick={() => navigate("staff")} type="button">⚙ <span>Personel</span></button>}
           </nav>
         </header>
         <button className="hero-online" type="button" onClick={copyAddress}><b>{copied ? "IP kopyalandı" : "Sunucuya bağlan"}</b><small>{SERVER_ADDRESS}</small></button>
-        <button className="hero-account" type="button" onClick={() => player ? logout() : setLoginOpen(true)}><span className="mini-avatar">▦</span><b>{player?.name ?? "Oyuncu Girişi"}</b></button>
+        <button className="hero-account" type="button" onClick={() => player ? navigate("profile") : setLoginOpen(true)}><span className="mini-avatar">▦</span><b>{player?.name ?? "Oyuncu Girişi"}</b></button>
       </section>
 
       <section className="server-summary" aria-label="Sunucu bilgileri">
@@ -332,14 +363,14 @@ export default function Home() {
             <div className="page-title"><div><small>OYUNCU PORTALI</small><h1>Kredi Yükle</h1><p>Site yalnızca kredi yükleme talebi alır. Ürün satın alma işlemleri oyun içinde <b>/sitemarket</b> menüsünden yapılır.</p></div>{player ? <div className="balance-box"><small>MEVCUT BAKİYE</small><b>{player.credits.toLocaleString("tr-TR")}</b><span>Kredi</span></div> : <button className="red-button" type="button" onClick={() => setLoginOpen(true)}>OYUNCU GİRİŞİ</button>}</div>
             <div className="credit-layout">
               <form className="white-card credit-form" onSubmit={submitCreditRequest}>
-                <div className="notice-bar">Kredi talebi göndermeden önce oyunda <b>/sitekod</b> komutuyla hesabını doğrula.</div>
+                <div className="notice-bar">Kredi talebi göndermek için oyunda AuthMe ile oluşturduğun hesabınla siteye giriş yap.</div>
                 <h2>Kredi paketi seç</h2>
                 <div className="package-grid">{packages.map((entry) => <button className={selectedPackage === entry.id ? "package active" : "package"} type="button" key={entry.id} onClick={() => setSelectedPackage(entry.id)}><span>{entry.credits.toLocaleString("tr-TR")}</span><small>KREDİ</small><b>{money(entry.priceKurus)}</b></button>)}</div>
                 <label><span>Ödeme / işlem referansı</span><input value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} minLength={6} maxLength={80} placeholder="Dekont veya işlem referansını yaz" required /></label>
                 <p className="field-help">Kart numarası, şifre veya kişisel ödeme bilgisi yazma. Personel yalnızca ödeme referansını doğrular.</p>
                 <button className="red-button submit-button" type="submit" disabled={busy}>{player ? `${selected?.credits.toLocaleString("tr-TR") ?? ""} KREDİ TALEBİ GÖNDER` : "ÖNCE OYUNCU GİRİŞİ YAP"}</button>
               </form>
-              <aside className="white-card history-card"><h2>Kredi Geçmişi</h2>{!player ? <div className="empty-panel"><BrandLogo size={62} /><b>Hesabınla giriş yap</b><p>Oyunda /sitekod yazarak aldığın kodu kullan.</p></div> : creditRequests.length === 0 ? <div className="empty-panel"><span className="large-symbol">◆</span><b>Henüz talep yok</b><p>İlk kredi yükleme talebin burada görünecek.</p></div> : <div className="history-list">{creditRequests.map((entry) => <article key={entry.id}><div><b>+{entry.credits.toLocaleString("tr-TR")} Kredi</b><small>{date(entry.created_at)}</small></div><span data-status={entry.status}>{statusText[entry.status]}</span></article>)}</div>}</aside>
+              <aside className="white-card history-card"><h2>Kredi Geçmişi</h2>{!player ? <div className="empty-panel"><BrandLogo size={62} /><b>AuthMe hesabınla giriş yap</b><p>Oyunda kayıt olurken belirlediğin kullanıcı adı ve şifreyi kullan.</p></div> : creditRequests.length === 0 ? <div className="empty-panel"><span className="large-symbol">◆</span><b>Henüz talep yok</b><p>İlk kredi yükleme talebin burada görünecek.</p></div> : <div className="history-list">{creditRequests.map((entry) => <article key={entry.id}><div><b>+{entry.credits.toLocaleString("tr-TR")} Kredi</b><small>{date(entry.created_at)}</small></div><span data-status={entry.status}>{statusText[entry.status]}</span></article>)}</div>}</aside>
             </div>
           </section>
         )}
@@ -380,12 +411,16 @@ export default function Home() {
               <section><span>02</span><div><h2>Hile ve açık kullanımı</h2><p>Haksız avantaj sağlayan istemciler, otomasyonlar, makrolar, bug kullanımı ve bunları gizlemek yasaktır. Bulduğun açığı personele bildir.</p></div></section>
               <section><span>03</span><div><h2>Ekonomi güvenliği</h2><p>Gerçek para karşılığı oyuncular arası satış, dolandırıcılık, izinsiz hesap paylaşımı ve ekonomi açıklarından yararlanmak yasaktır.</p></div></section>
               <section><span>04</span><div><h2>Ada ve yapı güvenliği</h2><p>Sunucuyu zorlayan makineler, kasıtlı gecikme düzenekleri ve diğer oyuncuların alanlarına zarar veren yapılar kaldırtılabilir.</p></div></section>
-              <section><span>05</span><div><h2>Hesap sorumluluğu</h2><p>Şifreni ve tek kullanımlık site kodunu kimseyle paylaşma. Hesabında yapılan işlemlerden hesap sahibi sorumludur.</p></div></section>
+              <section><span>05</span><div><h2>Hesap sorumluluğu</h2><p>AuthMe şifreni kimseyle paylaşma. Hesabında yapılan işlemlerden hesap sahibi sorumludur.</p></div></section>
               <section><span>06</span><div><h2>Personel kararları</h2><p>Yaptırımlar kanıt ve kayıtlar incelenerek uygulanır. İtirazlar yalnızca destek sistemi üzerinden, saygılı biçimde yapılır.</p></div></section>
             </div>
             <div className="rules-note"><b>Kuralların amacı ceza vermek değil, topluluğu korumaktır.</b><p>Açık olmayan bir durumla karşılaşırsan işlem yapmadan önce destek talebi aç.</p><button className="red-button" type="button" onClick={() => navigate("support")}>DESTEK AÇ</button></div>
           </article>
         )}
+
+        {page === "profile" && <ProfilePage player={player} creditRequests={creditRequests} supportTickets={supportTickets} orders={orders} onNavigate={(target) => navigate(target)} onLogout={logout} />}
+
+        {page === "staff" && <StaffPanel player={player} api={authorizedFetch} notify={showToast} />}
       </div>
 
       <section className="recent-strip"><div className="recent-label"><small>TOPLULUK</small><b>Son Kayıtlar</b></div>{[player?.name ?? "Yeni oyuncu", "SkyVillager", "Ada Ustası", "Yeni oyuncu", "Dactylion üyesi"].map((name, index) => <div className="recent-user" key={`${name}-${index}`}><span className={`pixel-avatar avatar-${index + 1}`}>{name.charAt(0).toLocaleUpperCase("tr-TR")}</span><p><b>{name}</b><small>{index === 0 ? "şimdi" : `${index + 2} dakika önce`}</small></p></div>)}</section>
@@ -396,7 +431,7 @@ export default function Home() {
         <div className="footer-bottom"><span>© 2026 Dactylion Network. Tüm hakları saklıdır.</span><span>Mojang veya Microsoft ile bağlantılı değildir.</span></div>
       </footer>
 
-      {loginOpen && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setLoginOpen(false); }}><section className="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title"><button className="modal-close" type="button" onClick={() => setLoginOpen(false)}>×</button><BrandLogo size={82} /><small>GÜVENLİ OYUNCU GİRİŞİ</small><h2 id="login-title">Dactylion hesabınla giriş yap</h2><p>Sunucuda <b>/sitekod</b> yaz. Sana verilen tek kullanımlık 6 haneli kodu aşağıya gir.</p><input value={loginCode} onChange={(event) => setLoginCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="000000" maxLength={6} onKeyDown={(event) => { if (event.key === "Enter") void login(); }} autoFocus />{loginError && <span className="form-error">{loginError}</span>}<button className="red-button" type="button" onClick={() => void login()} disabled={busy}>GİRİŞ YAP</button><em>Kod kısa süre geçerlidir ve yalnızca bir kez kullanılabilir.</em></section></div>}
+      {loginOpen && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setLoginOpen(false); }}><section className="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title"><button className="modal-close" type="button" onClick={() => !busy && setLoginOpen(false)}>×</button><BrandLogo size={82} /><small>AUTHME İLE GÜVENLİ GİRİŞ</small><h2 id="login-title">Dactylion hesabınla giriş yap</h2><p>Oyunda <b>/register</b> ile oluşturduğun Minecraft kullanıcı adı ve AuthMe şifreni kullan.</p><div className="login-credentials"><label><span>Minecraft kullanıcı adı</span><input value={loginUsername} onChange={(event) => setLoginUsername(event.target.value.replace(/[^A-Za-z0-9_]/g, "").slice(0, 16))} autoComplete="username" placeholder="OyuncuAdı" maxLength={16} disabled={busy} autoFocus /></label><label><span>AuthMe şifresi</span><input value={loginPassword} onChange={(event) => setLoginPassword(event.target.value.slice(0, 128))} type="password" autoComplete="current-password" placeholder="••••••••" minLength={8} maxLength={128} disabled={busy} onKeyDown={(event) => { if (event.key === "Enter") void login(); }} /></label></div>{loginStage && <span className="login-stage">{loginStage}</span>}{loginError && <span className="form-error">{loginError}</span>}<button className="red-button" type="button" onClick={() => void login()} disabled={busy}>{busy ? "AUTHME DOĞRULUYOR..." : "GİRİŞ YAP"}</button><em>Şifren site veritabanına kaydedilmez; doğrulamayı Minecraft sunucusundaki AuthMe yapar.</em></section></div>}
       {toast && <button className="toast" type="button" onClick={() => setToast("")}>{toast}</button>}
     </main>
   );
