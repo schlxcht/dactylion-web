@@ -7,7 +7,7 @@ import { CreditRequest, Player, ProfilePage, StaffPanel, SupportTicket } from ".
 const SERVER_ADDRESS = "play.dactylion.net";
 const DISCORD_URL = "https://discord.gg/SwGmr6K44z";
 const SITE_BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-const MARKET_API = "https://dactylion-market-api.marcellusperrycxeh.chatgpt.site";
+const MARKET_API = "https://dactylion-market-api-v2.quinngardnerbwcp.chatgpt.site";
 const TOKEN_KEY = "dactylion-market-token";
 
 type PageName = "home" | "credit" | "support" | "application" | "rules" | "profile" | "staff";
