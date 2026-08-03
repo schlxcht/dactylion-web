@@ -343,7 +343,7 @@ export default function Home() {
               </section>
               <section className="sidebar-section">
                 <div className="small-heading"><h2>Oyun İçi Market</h2></div>
-                <div className="mini-list"><div><span className="pixel-head">/</span><p><b>/sitemarket</b><small>VIP, kasa, spawner ve dahası</small></p><strong>OYUNDA</strong></div><div><span className="pixel-head">K</span><p><b>Ortak kredi hesabı</b><small>Site ve oyun bakiyesi eşleşir</small></p></div></div>
+                <div className="mini-list"><div><span className="pixel-head">/</span><p><b>/sitemarket</b><small>Kasa, spawner ve kozmetik ürünler</small></p><strong>OYUNDA</strong></div><div><span className="pixel-head">K</span><p><b>Ortak kredi hesabı</b><small>Site ve oyun bakiyesi eşleşir</small></p></div></div>
               </section>
               <a className="discord-card" href={DISCORD_URL} target="_blank" rel="noreferrer"><span>◉</span><div><small>DACTYLION NETWORK</small><b>Discord sunucumuza katıl</b><p>Duyuru, destek ve topluluk kanalları.</p></div><i>→</i></a>
             </aside>
@@ -423,7 +423,7 @@ export default function Home() {
         {page === "staff" && <StaffPanel player={player} api={authorizedFetch} notify={showToast} />}
       </div>
 
-      <section className="recent-strip"><div className="recent-label"><small>TOPLULUK</small><b>Son Kayıtlar</b></div>{[player?.name ?? "Yeni oyuncu", "SkyVillager", "Ada Ustası", "Yeni oyuncu", "Dactylion üyesi"].map((name, index) => <div className="recent-user" key={`${name}-${index}`}><span className={`pixel-avatar avatar-${index + 1}`}>{name.charAt(0).toLocaleUpperCase("tr-TR")}</span><p><b>{name}</b><small>{index === 0 ? "şimdi" : `${index + 2} dakika önce`}</small></p></div>)}</section>
+      <section className="recent-strip"><div className="recent-label"><small>TOPLULUK</small><b>Son Kayıtlar</b></div>{[player?.name ?? "Yeni oyuncu", "Ada Kaşifi", "Blok Ustası", "Yeni oyuncu", "Dactylion üyesi"].map((name, index) => <div className="recent-user" key={`${name}-${index}`}><span className={`pixel-avatar avatar-${index + 1}`}>{name.charAt(0).toLocaleUpperCase("tr-TR")}</span><p><b>{name}</b><small>{index === 0 ? "şimdi" : `${index + 2} dakika önce`}</small></p></div>)}</section>
 
       <footer>
         <div className="footer-shell"><section className="footer-about"><BrandLogo size={86} /><div><b>DACTYLION NETWORK</b><p>Topluluk odaklı, uzun vadeli ilerleyiş sunan modern Türk SkyBlock deneyimi.</p></div></section><section><h2>Kurumsal</h2><button type="button" onClick={() => navigate("rules")}>Kurallar</button><button type="button" onClick={() => navigate("application")}>Başvuru</button><button type="button" onClick={() => navigate("support")}>Destek</button></section><section><h2>Oyuncu</h2><button type="button" onClick={() => navigate("credit")}>Kredi Yükle</button><span>Ürünler: /sitemarket</span><button type="button" onClick={copyAddress}>Sunucu IP</button></section><section className="footer-community"><h2>Topluluğa Katıl</h2><a href={DISCORD_URL} target="_blank" rel="noreferrer">Discord <span>→</span></a><p>Duyurular, destek ve etkinlikler tek yerde.</p></section><BrandLogo size={132} className="footer-watermark" /></div>
